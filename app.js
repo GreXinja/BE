@@ -15,51 +15,77 @@ server.listen(8000, () => {
 
 //signup
 server.post("/users", async (req, res) => {
-    if (req.body.name && req.body.email && req.body.phone && req.body.password){
+    if (req.body.name && req.body.email && req.body.phone && req.body.password) {
         await connection.connect()
         const db = await connection.db(DB)
         const collection = await db.collection('users')
-        const result = await collection.find({"email": req.body.email}).toArray()
-        if(result.length>0){
-            res.json({error : "User Already Exists"})
+        const result = await collection.find({ "email": req.body.email }).toArray()
+        if (result.length > 0) {
+            res.json({ error: "User Already Exists" })
         }
-        else{
+        else {
             await collection.insertOne({
-                name : req.body.name,
-                email:req.body.email,
-                password:req.body.password,
-                phone:req.body.phone
+                name: req.body.name,
+                email: req.body.email,
+                password: req.body.password,
+                phone: req.body.phone
             })
-            res.json({message:"Success"})
+            res.json({ message: "Success" })
         }
     }
 })
 //login
 server.post("/tokens", async (req, res) => {
-    if (req.body.email && req.body.password){
+    if (req.body.email && req.body.password) {
         await connection.connect()
         const db = await connection.db(DB)
         const collection = await db.collection('users')
-        const result = await collection.find({"email": req.body.email,"password":req.body.password}).toArray()
-        if (result.length >0){
+        const result = await collection.find({ "email": req.body.email, "password": req.body.password }).toArray()
+        if (result.length > 0) {
 
             const generateToken = LibRandomString.generate(7)
             const user = result[0]
             await collection.updateOne(
-                {_id:user._id},
-                {$set: {token : generateToken}}
+                { _id: user._id },
+                { $set: { token: generateToken } }
             )
-            res.json({token:generateToken})
+            res.status(200).json({ token: generateToken })
         }
-        else{
-            res.json({ error :"Invaild Credentials"})
+        else {
+            res.status(400).json({ error: "Invaild Credentials" })
         }
 
-    }else{
-        res.json({error : "Missing Email or password "})
+    } else {
+        res.status(401).json({ error: "Missing Email or password " })
     }
 })
-server.post("/teams", (req, res) => {
-    console.log("Request recieved")
-    res.send("Team is Created")
-})
+server.get("/users/roles", async (req, res) => {
+    if (!req.headers.token) {
+        return res.status(400).json({ error: "No Token present" });
+    }
+
+    try {
+        await connection.connect();
+        const db = await connection.db(DB);
+        const collection = db.collection('users');
+
+        const result = await collection.find({ token: req.headers.token }).toArray();
+
+        if (result.length === 0) {
+            return res.status(401).json({ error: "No User present" });
+        }
+
+        const currentUser = result[0];
+
+        res.status(200).json({
+            admin: !!currentUser.is_admin,
+            TeamOwner: !!currentUser.owner_of,       // true if array or string exists
+            Player: !!currentUser.playing_for        // true if array or value exists
+        });
+
+    } catch (err) {
+        console.error("Error fetching user role:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
