@@ -1,22 +1,65 @@
-const LibExpress =  require("express")
-
+const LibExpress = require("express")
+const LibRandomString = require("randomstring")
+const { MongoClient } = require('mongodb')
+const LibCors = require('cors')
 const server = LibExpress();
+server.use(LibCors())
+server.use(LibExpress.json());
 
-server.listen(8000,()=>{
+const connection = new MongoClient("mongodb://ims_app_user:password123@localhost:27017/ims")
+const DB = "ims"
+
+server.listen(8000, () => {
     console.log("Server is listening and is connected to port 8000")
 })
 
-server.post("/users",(req,res)=>{
-    console.log("Request recieved")
-    res.send("User is Created")
-
+//signup
+server.post("/users", async (req, res) => {
+    if (req.body.name && req.body.email && req.body.phone && req.body.password){
+        await connection.connect()
+        const db = await connection.db(DB)
+        const collection = await db.collection('users')
+        const result = await collection.find({"email": req.body.email}).toArray()
+        if(result.length>0){
+            res.json({error : "User Already Exists"})
+        }
+        else{
+            await collection.insertOne({
+                name : req.body.name,
+                email:req.body.email,
+                password:req.body.password,
+                phone:req.body.phone
+            })
+            res.json({message:"Success"})
+        }
+    }
 })
-server.post("/players",(req,res)=>{
-    console.log("Request recieved")
-    res.send("Player is Created")
+//login
+server.post("/tokens", async (req, res) => {
+    if (req.body.email && req.body.password){
+        await connection.connect()
+        const db = await connection.db(DB)
+        const collection = await db.collection('users')
+        const result = await collection.find({"email": req.body.email,"password":req.body.password}).toArray()
+        if (result.length >0){
 
+            const generateToken = LibRandomString.generate(7)
+            const user = result[0]
+            await collection.updateOne(
+                {_id:user._id},
+                {$set: {token : generateToken}}
+            )
+            res.json({token:generateToken})
+        }
+        else{
+            res.json({ error :"Invaild Credentials"})
+        }
+
+    }else{
+        res.json({error : "Missing Email or password "})
+    }
 })
-server.post("/teams",(req,res)=>{
+server.post("/teams", (req, res) => {
     console.log("Request recieved")
     res.send("Team is Created")
 })
