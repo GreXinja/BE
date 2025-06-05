@@ -88,4 +88,66 @@ server.get("/users/roles", async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
+// GET /players - returns users who are players (i.e., have 'playing_for' field)
+server.get("/players", async (req, res) => {
+    const token = req.headers.token;
+
+    if (!token) {
+        return res.status(400).json({ error: "Missing token in header" });
+    }
+
+    try {
+        await connection.connect();
+        const db = await connection.db(DB);
+        const usersCollection = db.collection("users");
+
+        // Validate token
+        const user = await usersCollection.findOne({ token });
+
+        if (!user) {
+            return res.status(401).json({ error: "Invalid token" });
+        }
+
+        // Fetch all users who are players (i.e., have 'playing_for' field)
+        const players = await usersCollection.find({ playing_for: { $exists: true } }).toArray();
+
+        res.status(200).json(players);
+
+    } catch (error) {
+        console.error("Error fetching players:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+server.get("/teams", async (req, res) => {
+    const token = req.headers.token;
+
+    if (!token) {
+        return res.status(400).json({ error: "Missing token in header" });
+    }
+
+    try {
+        await connection.connect();
+        const db = await connection.db(DB);
+        const usersCollection = db.collection("users");
+
+        // Validate token
+        const user = await usersCollection.findOne({ token });
+
+        if (!user) {
+            return res.status(401).json({ error: "Invalid token" });
+        }
+
+        // Fetch all teams (fields at root level)
+        const teamsCollection = db.collection("teams");
+        const teams = await teamsCollection.find({}).toArray();
+
+        res.status(200).json(teams);
+
+    } catch (error) {
+        console.error("Error fetching teams:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+
 
